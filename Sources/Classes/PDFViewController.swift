@@ -18,9 +18,10 @@ extension PDFViewController {
     /// - parameter backButton:          button to override the default controller back button
     /// - parameter isThumbnailsEnabled: whether or not the thumbnails bar should be enabled
     /// - parameter startPageIndex:      page index to start on load, defaults to 0; if out of bounds, set to 0
+    /// - parameter hideToolBarsOnLoad:  whether or not the navigation bar and the thumbnails bar should be hidden on the first load
     ///
     /// - returns: a `PDFViewController`
-    public class func createNew(with document: PDFDocument, title: String? = nil, actionButtonImage: UIImage? = nil, actionStyle: ActionStyle = .print, backButton: UIBarButtonItem? = nil, isThumbnailsEnabled: Bool = true, startPageIndex: Int = 0) -> PDFViewController {
+    public class func createNew(with document: PDFDocument, title: String? = nil, actionButtonImage: UIImage? = nil, actionStyle: ActionStyle = .print, backButton: UIBarButtonItem? = nil, isThumbnailsEnabled: Bool = true, startPageIndex: Int = 0, hideToolBarsOnLoad: Bool = false) -> PDFViewController {
         let storyboard = UIStoryboard(name: "PDFReader", bundle: Bundle(for: PDFViewController.self))
         let controller = storyboard.instantiateInitialViewController() as! PDFViewController
         controller.document = document
@@ -46,6 +47,9 @@ extension PDFViewController {
             controller.actionButton = UIBarButtonItem(barButtonSystemItem: .action, target: controller, action: #selector(actionButtonPressed))
         }
         controller.isThumbnailsEnabled = isThumbnailsEnabled
+      
+        controller.shouldHideToolBars = hideToolBarsOnLoad
+      
         return controller
     }
 }
@@ -95,7 +99,10 @@ public final class PDFViewController: UIViewController {
     
     /// Backbutton used to override the default back button
     fileprivate var backButton: UIBarButtonItem?
-    
+  
+    /// Should hide navigation bar and thumbnails bar
+    fileprivate var shouldHideToolBars: Bool = false
+  
     /// Background color to apply to the collectionView.
     public var backgroundColor: UIColor? = .lightGray {
         didSet {
@@ -145,7 +152,16 @@ public final class PDFViewController: UIViewController {
         let width = min(thumbnailWidth, view.bounds.width)
         thumbnailCollectionControllerWidth.constant = width
     }
+  
+    public override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
     
+        if self.shouldHideToolBars {
+            self.setToolBarsHidden(true, animated: false)
+            self.shouldHideToolBars = false
+        }
+    }
+  
     public override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         didSelectIndexPath(IndexPath(row: currentPageIndex, section: 0))
@@ -247,7 +263,7 @@ extension PDFViewController: PDFPageCollectionViewCellDelegate {
     private func hideThumbnailController(_ shouldHide: Bool) {
         self.thumbnailCollectionControllerBottom.constant = shouldHide ? -thumbnailCollectionControllerHeight.constant : 0
     }
-    
+
     func handleSingleTap(_ cell: PDFPageCollectionViewCell, pdfPageView: PDFPageView) {
         var shouldHide: Bool {
             guard let isNavigationBarHidden = navigationController?.isNavigationBarHidden else {
@@ -255,9 +271,13 @@ extension PDFViewController: PDFPageCollectionViewCellDelegate {
             }
             return !isNavigationBarHidden
         }
-        UIView.animate(withDuration: 0.25) {
-            self.hideThumbnailController(shouldHide)
-            self.navigationController?.setNavigationBarHidden(shouldHide, animated: true)
+        self.setToolBarsHidden(shouldHide, animated: true)
+    }
+
+    func setToolBarsHidden(_ hidden: Bool, animated: Bool) {
+        UIView.animate(withDuration: animated ? 0.25 : 0.0) {
+            self.hideThumbnailController(hidden)
+            self.navigationController?.setNavigationBarHidden(hidden, animated: animated)
         }
     }
 }
